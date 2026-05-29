@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>中考nb</title>
+    <style>
+        :root {
+            --bg: rgba(255,255,255,0.6);
+            --card-bg: rgba(255,255,255,0.85);
+            --text: #3a3a3a;
+            --text-light: #5a5a5a;
+            --border: rgba(200,200,200,0.5);
+            --shadow: 0 2px 16px rgba(0,0,0,0.1);
+            --shadow-lg: 0 8px 40px rgba(0,0,0,0.15);
+            --accent: #5b7b94;
+            --accent-hover: #4a6780;
+            --danger: #c97a7a;
+            --input-bg: rgba(255,255,255,0.7);
+            --transition: 0.25s cubic-bezier(0.4,0,0.2,1);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        #bgVideo { position:fixed; top:0; left:0; width:100vw; height:100vh; object-fit:cover; z-index:-2; }
+        .video-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.25); z-index:-1; pointer-events:none; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            min-height:100vh; height:100vh; overflow:hidden;
+            display:flex; flex-direction:column; align-items:center;
+            user-select:none; -webkit-user-select:none; position:relative; background:transparent;
+        }
+        .header { position:relative; z-index:50; padding:12px 16px 8px; display:flex; align-items:center; justify-content:center; }
+        .header .title { font-size:1.4rem; font-weight:700; color:#2c2c2c; display:flex; align-items:center; gap:6px; text-shadow:0 1px 4px rgba(255,255,255,0.6); }
+        .header .title .icon { font-size:1.5rem; animation:gentleBounce 2.5s infinite; }
+        @keyframes gentleBounce { 0%,100%{transform:translateY(0)} 30%{transform:translateY(-8px)} 50%{transform:translateY(0)} 70%{transform:translateY(-5px)} }
+
+        /* 自动播放提示浮层 */
+        .autoplay-overlay {
+            position:fixed; top:0; left:0; width:100%; height:100%;
+            background:rgba(0,0,0,0.3); z-index:999;
+            display:flex; align-items:center; justify-content:center;
+            cursor:pointer; backdrop-filter:blur(4px);
+        }
+        .autoplay-overlay .play-hint {
+            background:rgba(255,255,255,0.9); border-radius:24px;
+            padding:24px 36px; text-align:center;
+            box-shadow:0 10px 40px rgba(0,0,0,0.2);
+            font-size:1.2rem; font-weight:600; color:#333;
+        }
+        .autoplay-overlay .play-hint .icon { font-size:2rem; display:block; margin-bottom:8px; }
+
+        .bubble-stage { position:fixed; top:0; left:0; width:100vw; height:100vh; pointer-events:none; z-index:100; }
+        .bubble {
+            position:absolute; padding:12px 18px; border-radius:20px; font-size:0.95rem; line-height:1.5;
+            color:#2a2a2a; max-width:300px; word-break:break-word;
+            box-shadow:0 6px 24px rgba(0,0,0,0.1); animation:floatAcross var(--duration,13s) linear forwards;
+            white-space:pre-wrap; letter-spacing:0.02em; backdrop-filter:blur(3px);
+            background:rgba(255,255,255,0.8); top:50vh; transform:translateY(-50%); will-change:left;
+        }
+        .bubble::after {
+            content:''; position:absolute; bottom:-8px; left:24px; width:14px; height:14px;
+            background:inherit; border-radius:0 0 4px 0; transform:rotate(45deg); z-index:-1; opacity:0.8;
+        }
+        .bubble.removing { opacity:0; transform:translateY(-50%) scale(0.7); transition:0.35s; }
+        @keyframes floatAcross { 0%{left:100vw; opacity:0} 3%{opacity:1} 100%{left:-350px; opacity:0} }
+        .input-area {
+            position:fixed; bottom:0; left:50%; transform:translateX(-50%); z-index:300;
+            width:100%; max-width:600px; padding:12px 16px 16px; display:flex; gap:8px;
+            margin-bottom:env(safe-area-inset-bottom, 0px);
+        }
+        .input-area::before {
+            content:''; position:absolute; bottom:0; left:0; width:100%; height:140%;
+            background:linear-gradient(to top, rgba(255,255,255,0.95) 40%, transparent 100%); z-index:-1;
+        }
+        .input-wrapper {
+            flex:1; background:var(--card-bg); border-radius:24px; box-shadow:var(--shadow);
+            border:1.5px solid var(--border); transition:var(--transition); display:flex; align-items:center;
+            backdrop-filter:blur(5px);
+        }
+        .input-wrapper:focus-within { border-color:var(--accent); box-shadow:0 4px 24px rgba(91,123,148,0.2); }
+        .input-wrapper textarea {
+            flex:1; border:none; background:transparent; padding:10px 14px; font-size:0.95rem;
+            font-family:inherit; color:var(--text); resize:none; outline:none; min-height:44px;
+            max-height:100px; border-radius:24px;
+        }
+        .send-btn {
+            width:44px; height:44px; border-radius:50%; background:var(--accent); color:#fff;
+            border:none; cursor:pointer; font-size:1.3rem; box-shadow:0 4px 14px rgba(91,123,148,0.3);
+            display:flex; align-items:center; justify-content:center; transition:var(--transition); flex-shrink:0;
+        }
+        .send-btn:hover { background:var(--accent-hover); transform:translateY(-2px); }
+        .char-count { position:absolute; right:16px; top:-18px; font-size:0.7rem; color:#666; opacity:0; transition:0.2s; }
+        .input-wrapper:focus-within .char-count, .char-count.visible { opacity:1; }
+
+        .music-entry, .admin-entry {
+            position:fixed; z-index:400; width:40px; height:40px; border-radius:50%;
+            background:rgba(255,255,255,0.8); border:1.5px solid var(--border); cursor:pointer;
+            display:flex; align-items:center; justify-content:center; font-size:1.2rem;
+            box-shadow:var(--shadow); transition:var(--transition); color:#444; backdrop-filter:blur(4px);
+        }
+        .music-entry { bottom:130px; right:28px; }
+        .admin-entry { bottom:78px; right:28px; }
+        .music-entry:hover, .admin-entry:hover { background:#fff; box-shadow:var(--shadow-lg); transform:translateY(-2px); color:#222; }
+        .admin-entry .tooltip { position:absolute; right:52px; background:#333; color:#fff; font-size:0.7rem; padding:6px 12px; border-radius:20px; white-space:nowrap; pointer-events:none; opacity:0; transition:0.2s; }
+        .admin-entry:hover .tooltip { opacity:1; }
+
+        .music-panel {
+            position:fixed; bottom:160px; right:80px; z-index:450; background:rgba(255,255,255,0.85);
+            border-radius:18px; box-shadow:var(--shadow-lg); padding:14px 16px; display:none;
+            width:280px; border:1px solid var(--border); backdrop-filter:blur(10px);
+        }
+        .music-panel.open { display:block; }
+        .music-panel .song-info { font-size:0.9rem; margin-bottom:8px; display:flex; justify-content:space-between; }
+        .music-panel .controls { display:flex; align-items:center; gap:8px; justify-content:center; }
+        .music-panel button { background:rgba(255,255,255,0.7); border:1px solid #ccc; border-radius:50%; width:32px; height:32px; cursor:pointer; font-size:1rem; display:flex; align-items:center; justify-content:center; transition:0.2s; }
+        .music-panel button:hover { background:#fff; }
+        .progress-bar { flex:1; height:4px; background:#ddd; border-radius:2px; cursor:pointer; }
+        .progress { height:100%; background:var(--accent); width:0%; transition:width 0.3s linear; }
+        .volume-slider { width:60px; }
+        .playlist-toggle { font-size:0.8rem; margin-top:6px; text-align:center; cursor:pointer; color:var(--accent); }
+        .playlist-dropdown { background:rgba(255,255,255,0.9); border:1px solid #ddd; border-radius:12px; margin-top:8px; max-height:150px; overflow-y:auto; font-size:0.85rem; }
+        .playlist-dropdown div { padding:8px 12px; cursor:pointer; }
+        .playlist-dropdown div:hover, .playlist-dropdown div.active { background:#f0f0f0; color:var(--accent); }
+
+        .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.4); z-index:500; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(4px); animation:fadeIn 0.25s; }
+        @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+        .modal { background:rgba(255,255,255,0.95); border-radius:20px; box-shadow:0 20px 60px rgba(0,0,0,0.2); width:92%; max-width:520px; max-height:80vh; display:flex; flex-direction:column; animation:slideUp 0.3s; overflow:hidden; }
+        @keyframes slideUp { from{transform:translateY(30px); opacity:0} to{transform:translateY(0); opacity:1} }
+        .modal-header { padding:16px 20px; border-bottom:1px solid #eee; display:flex; align-items:center; justify-content:space-between; }
+        .modal-header h3 { font-size:1.1rem; font-weight:700; display:flex; align-items:center; gap:8px; color:#333; }
+        .modal-close { width:34px; height:34px; border-radius:50%; border:none; background:#f5f5f5; cursor:pointer; font-size:1rem; color:#666; display:flex; align-items:center; justify-content:center; transition:0.2s; }
+        .modal-close:hover { background:#e0e0e0; }
+        .modal-body { flex:1; overflow-y:auto; padding:16px 20px; display:flex; flex-direction:column; gap:10px; }
+        .badge-count { background:#f0ebe2; color:#8a7e6e; font-size:0.7rem; padding:2px 8px; border-radius:20px; margin-left:6px; }
+        .blacklist-badge { background:#ffe6e6; color:#b85454; font-size:0.7rem; padding:2px 8px; border-radius:20px; margin-left:6px; cursor:pointer; border:1px solid #f0c0c0; }
+        .message-list-item { display:flex; align-items:flex-start; gap:10px; padding:12px 14px; background:#fafaf8; border-radius:12px; border:1px solid #f0ede8; }
+        .message-list-item .msg-content { flex:1; }
+        .message-list-item .msg-text { font-size:0.9rem; color:#333; }
+        .msg-meta { font-size:0.7rem; color:#999; margin-top:4px; display:flex; flex-wrap:wrap; gap:6px; }
+        .msg-ip { background:#f0ebe2; color:#8a7e6e; padding:2px 8px; border-radius:10px; font-size:0.65rem; font-family:monospace; }
+        .delete-msg-btn, .block-ip-btn { width:28px; height:28px; border-radius:50%; border:1px solid #e8e2da; background:#fff; cursor:pointer; font-size:0.85rem; color:#999; display:flex; align-items:center; justify-content:center; transition:0.2s; flex-shrink:0; }
+        .delete-msg-btn:hover { background:#fef5f5; border-color:var(--danger); color:var(--danger); }
+        .block-ip-btn { margin-left:4px; }
+        .block-ip-btn:hover { background:#fff5e6; border-color:#e6a86e; color:#c97a3c; }
+
+        @media (max-width: 640px) {
+            .header .title { font-size:1.25rem; }
+            .header .title .icon { font-size:1.3rem; }
+            .bubble { max-width:240px; padding:10px 14px; font-size:0.85rem; border-radius:16px; }
+            @keyframes floatAcross { 0%{left:100vw; opacity:0} 100%{left:-280px; opacity:0} }
+            .input-area { padding:10px 12px 14px; gap:6px; }
+            .input-wrapper textarea { padding:10px 12px; font-size:0.9rem; min-height:40px; }
+            .send-btn { width:40px; height:40px; font-size:1.1rem; }
+            .music-entry { bottom:125px; right:16px; width:38px; height:38px; font-size:1.1rem; }
+            .admin-entry { bottom:80px; right:16px; width:38px; height:38px; font-size:1.1rem; }
+            .music-panel { bottom:170px; right:16px; left:16px; width:auto; max-width:300px; margin:0 auto; }
+            .modal { width:95%; max-height:85vh; border-radius:16px; }
+            .modal-header { padding:14px 16px; }
+            .modal-body { padding:12px 16px; }
+            .modal-header h3 { font-size:1rem; }
+        }
+    </style>
+</head>
+<body>
+    <video id="bgVideo" autoplay muted loop playsinline></video>
+    <div class="video-overlay"></div>
+
+    <div class="header"><span class="title"><span class="icon">☁️</span>2301中考加油</span></div>
+    <div class="bubble-stage" id="bubbleStage"></div>
+
+    <div class="input-area">
+        <div class="input-wrapper">
+            <textarea id="messageInput" placeholder="会当临绝顶..." maxlength="300" rows="1"></textarea>
+            <span class="char-count" id="charCount">0/300</span>
+        </div>
+        <button class="send-btn" id="sendBtn">✉</button>
+    </div>
+
+    <div class="music-entry" id="musicEntry">🎵</div>
+    <div class="admin-entry" id="adminEntry">🔑<span class="tooltip">管理员入口</span></div>
+
+    <div class="music-panel" id="musicPanel">
+        <div class="song-info"><span id="currentSongName">未选择</span><span id="currentTime">00:00</span></div>
+        <div class="controls">
+            <button id="prevBtn">⏮</button>
+            <button id="playPauseBtn">▶️</button>
+            <button id="nextBtn">⏭</button>
+            <div class="progress-bar" id="progressBar"><div class="progress" id="progress"></div></div>
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.1" value="0.5" class="volume-slider">
+        </div>
+        <div class="playlist-toggle" id="playlistToggle">📜 播放列表</div>
+        <div class="playlist-dropdown" id="playlistDropdown" style="display:none;"></div>
+    </div>
+
+    <audio id="audioPlayer" preload="auto"></audio>
+    <div id="modalContainer"></div>
+
+    <script>
+        (function() {
+            // ==================== 常量 ====================
+            const STORAGE_KEY = 'msg_board_messages';
+            const BLACKLIST_KEY = 'msg_board_blacklist';
+            const PLAYLIST_KEY = 'msg_board_playlist';
+            const ADMIN_SESSION_KEY = 'msg_admin_auth';
+            const ADMIN_PASSWORD = 'buzhidao';
+            const DEFAULT_VIDEO_URL = 'https://assets.mixkit.co/videos/preview/mixkit-tree-with-yellow-flowers-1173-large.mp4';
+            const BUBBLE_COLORS = ['#FFE8D9','#FFDCE0','#FDE4CF','#FFF1D0','#E8F0FE','#DCE9FF','#E0F0F5','#D6F0FA','#E6F5E6','#DCEDDC','#E8F8E0','#F5E8F5','#F0E0F0','#FDE8F5','#FFF8E0','#FFFDE0','#E8F5F5','#E0F2F1'];
+            const DB_NAME = 'bgVideoDB', DB_STORE = 'videos', VIDEO_KEY = 'userBgVideo';
+
+            // ==================== DOM ====================
+            const bgVideo = document.getElementById('bgVideo');
+            const bubbleStage = document.getElementById('bubbleStage');
+            const messageInput = document.getElementById('messageInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const charCount = document.getElementById('charCount');
+            const adminEntry = document.getElementById('adminEntry');
+            const modalContainer = document.getElementById('modalContainer');
+            const musicEntry = document.getElementById('musicEntry');
+            const musicPanel = document.getElementById('musicPanel');
+            const audioPlayer = document.getElementById('audioPlayer');
+            const playPauseBtn = document.getElementById('playPauseBtn');
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const progressBar = document.getElementById('progressBar');
+            const progress = document.getElementById('progress');
+            const volumeSlider = document.getElementById('volumeSlider');
+            const currentSongName = document.getElementById('currentSongName');
+            const currentTimeSpan = document.getElementById('currentTime');
+            const playlistToggle = document.getElementById('playlistToggle');
+            const playlistDropdown = document.getElementById('playlistDropdown');
+
+            let displayQueue = [], displayTimer = null, activeBubbles = new Map(), displayedInCycle = new Set();
+            let isAdminAuthenticated = sessionStorage.getItem(ADMIN_SESSION_KEY) === 'true';
+            let currentPlaylist = [], currentSongIndex = -1, isPlaying = false, userInteracted = false;
+            let loadMessagesRawCurrent = null;
+
+            // ==================== IndexedDB 视频 ====================
+            function openDB() {
+                return new Promise((resolve, reject) => {
+                    const request = indexedDB.open(DB_NAME, 1);
+                    request.onupgradeneeded = e => { e.target.result.createObjectStore(DB_STORE); };
+                    request.onsuccess = e => resolve(e.target.result);
+                    request.onerror = e => reject(e.target.error);
+                });
+            }
+            async function saveVideoToDB(blob) {
+                const db = await openDB();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(DB_STORE, 'readwrite');
+                    tx.objectStore(DB_STORE).put(blob, VIDEO_KEY);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = e => reject(e.target.error);
+                });
+            }
+            async function loadVideoFromDB() {
+                const db = await openDB();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(DB_STORE, 'readonly');
+                    const req = tx.objectStore(DB_STORE).get(VIDEO_KEY);
+                    req.onsuccess = () => resolve(req.result);
+                    req.onerror = e => reject(e.target.error);
+                });
+            }
+            async function deleteVideoFromDB() {
+                const db = await openDB();
+                return new Promise((resolve, reject) => {
+                    const tx = db.transaction(DB_STORE, 'readwrite');
+                    tx.objectStore(DB_STORE).delete(VIDEO_KEY);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = e => reject(e.target.error);
+                });
+            }
+
+            async function initBackgroundVideo() {
+                try {
+                    const blob = await loadVideoFromDB();
+                    if (blob && blob instanceof Blob) {
+                        bgVideo.src = URL.createObjectURL(blob);
+                    } else {
+                        bgVideo.src = DEFAULT_VIDEO_URL;
+                    }
+                } catch (e) {
+                    bgVideo.src = DEFAULT_VIDEO_URL;
+                }
+            }
+
+            function changeBackgroundVideo() {
+                const input = document.createElement('input');
+                input.type = 'file'; input.accept = 'video/*';
+                input.onchange = async (e) => {
+                    const file = e.target.files[0];
+                    if (!file) return;
+                    try {
+                        await saveVideoToDB(file);
+                        bgVideo.src = URL.createObjectURL(file);
+                        alert('背景视频已更新！');
+                    } catch (err) { alert('保存失败：' + err.message); }
+                };
+                input.click();
+            }
+
+            async function deleteLocalBackground() {
+                if (confirm('删除本地视频，恢复默认？')) {
+                    try { await deleteVideoFromDB(); bgVideo.src = DEFAULT_VIDEO_URL; alert('已恢复'); } catch(e) { alert('失败'); }
+                }
+            }
+
+            // ==================== 黑名单 ====================
+            function loadBlacklist() { try { return JSON.parse(localStorage.getItem(BLACKLIST_KEY) || '[]'); } catch(e) { return []; } }
+            function saveBlacklist(list) { localStorage.setItem(BLACKLIST_KEY, JSON.stringify(list)); }
+            function isIpBlocked(ip) { return loadBlacklist().includes(ip); }
+            function addToBlacklist(ip) {
+                if (!ip || ip === '0.0.0.0') return false;
+                const list = loadBlacklist();
+                if (!list.includes(ip)) { list.push(ip); saveBlacklist(list); removeMessagesByIp(ip); broadcast('blacklist_add', {ip}); return true; }
+                return false;
+            }
+            function removeFromBlacklist(ip) {
+                const list = loadBlacklist(); const idx = list.indexOf(ip);
+                if (idx !== -1) { list.splice(idx,1); saveBlacklist(list); broadcast('blacklist_remove', {ip}); return true; }
+                return false;
+            }
+
+            // ==================== 消息 ====================
+            function loadMessagesRaw() { try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) { return []; } }
+            function saveMessagesRaw(msgs) { localStorage.setItem(STORAGE_KEY, JSON.stringify(msgs)); }
+            function loadMessages() { const bl = loadBlacklist(); return loadMessagesRaw().filter(m => !bl.includes(m.ip)); }
+            function removeMessagesByIp(ip) {
+                const msgs = loadMessagesRaw();
+                const filtered = msgs.filter(m => m.ip !== ip);
+                if (filtered.length !== msgs.length) {
+                    saveMessagesRaw(filtered);
+                    displayQueue = displayQueue.filter(m => m.ip !== ip);
+                    for (let [id, bubble] of activeBubbles) { if (msgs.find(m => m.id === id && m.ip === ip)) removeBubbleByMessageId(id); }
+                    refreshDisplayQueue();
+                    if (isAdminAuthenticated && document.getElementById('adminPanel')) refreshAdminPanel();
+                }
+            }
+            function addMessage(text, ip) {
+                const msgs = loadMessagesRaw();
+                const newMsg = { id: 'msg_'+Date.now().toString(36)+Math.random().toString(36).substr(2,9), text: text.trim(), timestamp: Date.now(), ip: ip || '0.0.0.0' };
+                msgs.push(newMsg); saveMessagesRaw(msgs); broadcast('add', newMsg); return newMsg;
+            }
+            function deleteMessageById(id) {
+                const msgs = loadMessagesRaw(); const idx = msgs.findIndex(m => m.id === id);
+                if (idx === -1) return false;
+                msgs.splice(idx,1); saveMessagesRaw(msgs);
+                displayQueue = displayQueue.filter(m => m.id !== id); displayedInCycle.delete(id);
+                removeBubbleByMessageId(id); broadcast('delete', {id}); return true;
+            }
+
+            async function getUserIP() {
+                try { const r = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(3000) }); return (await r.json()).ip || '0.0.0.0'; }
+                catch(e) { return '0.0.0.0'; }
+            }
+
+            // ==================== 同步 ====================
+            function broadcast(action, data) {
+                localStorage.setItem('__msg_signal__', JSON.stringify({action, data, ts: Date.now()}));
+                setTimeout(() => localStorage.removeItem('__msg_signal__'), 50);
+            }
+            window.addEventListener('storage', e => {
+                if (e.key === '__msg_signal__' && e.newValue) {
+                    try { handleRemoteSignal(JSON.parse(e.newValue)); } catch(err) {}
+                }
+                if (e.key === STORAGE_KEY || e.key === BLACKLIST_KEY || e.key === PLAYLIST_KEY) {
+                    refreshDisplayQueue();
+                    if (isAdminAuthenticated && document.getElementById('adminPanel')) refreshAdminPanel();
+                }
+            });
+            function handleRemoteSignal(signal) {
+                if (!signal || !signal.action) return;
+                switch(signal.action) {
+                    case 'add':
+                        if (signal.data && signal.data.id && !isIpBlocked(signal.data.ip)) {
+                            if (!displayQueue.some(m => m.id === signal.data.id) && !activeBubbles.has(signal.data.id)) {
+                                displayQueue.push(signal.data); ensureDisplayTimer();
+                            }
+                        } break;
+                    case 'delete':
+                        if (signal.data?.id) {
+                            displayQueue = displayQueue.filter(m => m.id !== signal.data.id);
+                            displayedInCycle.delete(signal.data.id); removeBubbleByMessageId(signal.data.id);
+                        } break;
+                    case 'blacklist_add': refreshDisplayQueue(); break;
+                    case 'blacklist_remove': refreshDisplayQueue(); break;
+                }
+            }
+
+            // ==================== 气泡 ====================
+            function createBubble(msg) {
+                const bubble = document.createElement('div'); bubble.className = 'bubble';
+                bubble.dataset.messageId = msg.id; bubble.textContent = msg.text;
+                bubble.style.backgroundColor = BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)];
+                bubble.style.left = '100vw';
+                const duration = 11 + Math.random() * 6;
+                bubble.style.setProperty('--duration', duration+'s');
+                bubble.style.animationDuration = duration+'s';
+                bubbleStage.appendChild(bubble);
+                activeBubbles.set(msg.id, bubble);
+                bubble.addEventListener('animationend', () => removeBubbleElement(bubble, msg.id));
+                bubble.addEventListener('animationcancel', () => removeBubbleElement(bubble, msg.id));
+            }
+            function removeBubbleElement(bubble, id) {
+                if (!bubble || !bubble.parentNode) return;
+                bubble.classList.add('removing');
+                setTimeout(() => { if (bubble.parentNode) bubble.remove(); activeBubbles.delete(id); }, 350);
+            }
+            function removeBubbleByMessageId(id) { const b = activeBubbles.get(id); if (b) removeBubbleElement(b, id); }
+
+            function refreshDisplayQueue() {
+                const msgs = loadMessages(); loadMessagesRawCurrent = JSON.stringify(loadMessagesRaw());
+                const activeIds = new Set(activeBubbles.keys());
+                displayQueue = displayQueue.filter(m => msgs.some(x => x.id === m.id));
+                for (const msg of msgs) {
+                    if (!activeIds.has(msg.id) && !displayQueue.some(m => m.id === msg.id) && !displayedInCycle.has(msg.id))
+                        displayQueue.push(msg);
+                }
+                if (displayQueue.length === 0 && msgs.length > 0 && activeBubbles.size === 0) {
+                    displayedInCycle.clear(); for (const msg of msgs) displayQueue.push(msg);
+                }
+                ensureDisplayTimer();
+            }
+            function ensureDisplayTimer() { if (!displayTimer && displayQueue.length) scheduleNextDisplay(); }
+            function scheduleNextDisplay() {
+                clearTimeout(displayTimer);
+                if (displayQueue.length === 0) { displayTimer = null; return; }
+                displayTimer = setTimeout(() => { displayTimer = null; showNextFromQueue(); }, 1800 + Math.random() * 2700);
+            }
+            function showNextFromQueue() {
+                if (!displayQueue.length) { scheduleNextDisplay(); return; }
+                const msg = displayQueue.shift();
+                if (!msg || !loadMessages().some(m => m.id === msg.id) || activeBubbles.has(msg.id)) { scheduleNextDisplay(); return; }
+                createBubble(msg); displayedInCycle.add(msg.id); scheduleNextDisplay();
+            }
+
+            // ==================== 发送 ====================
+            async function handleSend() {
+                const text = messageInput.value.trim();
+                if (!text) return;
+                if (text.length > 300) { alert('留言不能超过300字'); return; }
+                sendBtn.disabled = true; sendBtn.textContent = '⏳';
+                try {
+                    const ip = await getUserIP();
+                    if (isIpBlocked(ip)) { alert('您的IP已被拉黑'); return; }
+                    const msg = addMessage(text, ip);
+                    createBubble(msg); displayedInCycle.add(msg.id);
+                    messageInput.value = ''; updateCharCount(); messageInput.style.height = 'auto';
+                    loadMessagesRawCurrent = JSON.stringify(loadMessagesRaw());
+                    if (isAdminAuthenticated && document.getElementById('adminPanel')) refreshAdminPanel();
+                } catch(e) { alert('发送失败'); }
+                finally { sendBtn.disabled = false; sendBtn.textContent = '✉'; }
+            }
+            messageInput.addEventListener('input', function() {
+                updateCharCount(); this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 100) + 'px';
+            });
+            messageInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } });
+            sendBtn.addEventListener('click', handleSend);
+            function updateCharCount() {
+                charCount.textContent = messageInput.value.length + '/300';
+                charCount.classList.toggle('visible', messageInput.value.length > 0);
+            }
+
+            // ==================== 音乐 ====================
+            const DEFAULT_PLAYLIST = [
+                { name: '轻音乐1 (3:56)', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3' },
+                { name: '轻音乐2 (5:11)', url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3' }
+            ];
+            function loadPlaylist() { try { const s = JSON.parse(localStorage.getItem(PLAYLIST_KEY)); return (s && s.length) ? s : [...DEFAULT_PLAYLIST]; } catch(e) { return [...DEFAULT_PLAYLIST]; } }
+            function savePlaylist(list) { localStorage.setItem(PLAYLIST_KEY, JSON.stringify(list)); currentPlaylist = list; renderPlaylistDropdown(); }
+            function initPlaylist() { currentPlaylist = loadPlaylist(); if (currentPlaylist.length) { currentSongIndex = 0; loadSong(0); } renderPlaylistDropdown(); }
+            function loadSong(index) {
+                if (index < 0 || index >= currentPlaylist.length) return;
+                currentSongIndex = index;
+                const song = currentPlaylist[index];
+                audioPlayer.src = song.url; currentSongName.textContent = song.name;
+                audioPlayer.load();
+                if (isPlaying || userInteracted) audioPlayer.play().then(() => { isPlaying = true; updatePlayBtn(); }).catch(() => {});
+            }
+            function togglePlay() {
+                if (!audioPlayer.src) return;
+                if (audioPlayer.paused) audioPlayer.play().then(() => { isPlaying = true; updatePlayBtn(); }).catch(() => {});
+                else { audioPlayer.pause(); isPlaying = false; updatePlayBtn(); }
+            }
+            function updatePlayBtn() { playPauseBtn.textContent = isPlaying ? '⏸' : '▶️'; musicEntry.classList.toggle('playing', isPlaying); }
+            audioPlayer.addEventListener('play', () => { isPlaying = true; updatePlayBtn(); });
+            audioPlayer.addEventListener('pause', () => { isPlaying = false; updatePlayBtn(); });
+            audioPlayer.addEventListener('timeupdate', () => {
+                if (audioPlayer.duration) {
+                    progress.style.width = (audioPlayer.currentTime / audioPlayer.duration * 100) + '%';
+                    const m = Math.floor(audioPlayer.currentTime / 60), s = Math.floor(audioPlayer.currentTime % 60).toString().padStart(2,'0');
+                    currentTimeSpan.textContent = `${m}:${s}`;
+                }
+            });
+            audioPlayer.addEventListener('ended', nextSong);
+            function nextSong() { if (currentPlaylist.length) { currentSongIndex = (currentSongIndex + 1) % currentPlaylist.length; loadSong(currentSongIndex); } }
+            function prevSong() { if (currentPlaylist.length) { currentSongIndex = (currentSongIndex - 1 + currentPlaylist.length) % currentPlaylist.length; loadSong(currentSongIndex); } }
+            progressBar.addEventListener('click', e => {
+                if (!audioPlayer.duration) return;
+                const rect = progressBar.getBoundingClientRect();
+                audioPlayer.currentTime = ((e.clientX - rect.left) / rect.width) * audioPlayer.duration;
+            });
+            volumeSlider.addEventListener('input', () => { audioPlayer.volume = volumeSlider.value; });
+            playPauseBtn.addEventListener('click', togglePlay);
+            nextBtn.addEventListener('click', nextSong);
+            prevBtn.addEventListener('click', prevSong);
+
+            function renderPlaylistDropdown() {
+                playlistDropdown.innerHTML = currentPlaylist.map((s, i) => `<div class="${i === currentSongIndex ? 'active' : ''}" data-index="${i}">${s.name}</div>`).join('');
+                playlistDropdown.querySelectorAll('div').forEach(d => d.addEventListener('click', function() {
+                    loadSong(parseInt(this.dataset.index)); if (!isPlaying) togglePlay();
+                    playlistDropdown.style.display = 'none';
+                }));
+            }
+            playlistToggle.addEventListener('click', () => { playlistDropdown.style.display = playlistDropdown.style.display === 'none' ? 'block' : 'none'; });
+            musicEntry.addEventListener('click', () => { musicPanel.classList.toggle('open'); });
+
+            function attemptAutoPlay() {
+                if (currentPlaylist.length && currentSongIndex === -1) { currentSongIndex = 0; loadSong(0); }
+                if (audioPlayer.src) {
+                    audioPlayer.play().then(() => {
+                        isPlaying = true; updatePlayBtn(); userInteracted = true;
+                    }).catch(() => {
+                        // 自动播放被阻止，显示点击提示浮层
+                        const overlay = document.createElement('div');
+                        overlay.className = 'autoplay-overlay';
+                        overlay.innerHTML = `<div class="play-hint"><span class="icon">▶️</span>点击任意位置开始播放音乐</div>`;
+                        document.body.appendChild(overlay);
+                        const resumeHandler = () => {
+                            audioPlayer.play().then(() => { isPlaying = true; updatePlayBtn(); userInteracted = true; }).catch(() => {});
+                            overlay.remove();
+                            document.removeEventListener('click', resumeHandler);
+                        };
+                        document.addEventListener('click', resumeHandler, { once: true });
+                    });
+                }
+            }
+
+            // ==================== 管理员 ====================
+            function openPasswordModal() {
+                const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; overlay.id = 'pwdModal';
+                overlay.innerHTML = `<div class="modal" style="max-width:400px"><div class="modal-header"><h3>🔐 管理员验证</h3><button class="modal-close close-pwd">✕</button></div><div class="modal-body"><p style="font-size:0.85rem; color:#555;">请输入密码</p><div style="display:flex; gap:8px;"><input type="password" id="pwdInput" placeholder="密码" style="flex:1; padding:10px; border-radius:8px; border:1px solid #ccc;"><button id="pwdConfirmBtn" style="padding:10px 16px; background:#5b7b94; color:#fff; border:none; border-radius:8px;">确认</button></div><div id="pwdError" style="color:#c97a7a; font-size:0.8rem;"></div></div></div>`;
+                modalContainer.appendChild(overlay);
+                overlay.querySelector('.close-pwd').addEventListener('click', () => closeModal(overlay));
+                overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(overlay); });
+                const input = overlay.querySelector('#pwdInput'); input.focus();
+                overlay.querySelector('#pwdConfirmBtn').addEventListener('click', () => {
+                    if (input.value === ADMIN_PASSWORD) { isAdminAuthenticated = true; sessionStorage.setItem(ADMIN_SESSION_KEY, 'true'); closeModal(overlay); openAdminPanel(); }
+                    else { overlay.querySelector('#pwdError').textContent = '密码错误'; input.value = ''; input.focus(); }
+                });
+                input.addEventListener('keydown', e => { if (e.key === 'Enter') overlay.querySelector('#pwdConfirmBtn').click(); });
+            }
+
+            function openAdminPanel() {
+                const existing = document.getElementById('adminPanel'); if (existing) closeModal(existing);
+                const msgs = loadMessagesRaw(), bl = loadBlacklist();
+                const sorted = [...msgs].sort((a,b) => b.timestamp - a.timestamp);
+                const overlay = document.createElement('div'); overlay.className = 'modal-overlay'; overlay.id = 'adminPanel';
+                overlay.innerHTML = `<div class="modal"><div class="modal-header"><h3>📋 留言管理 <span class="badge-count">${msgs.length}</span><span class="blacklist-badge" id="showBlacklistBtn">🚫 黑名单(${bl.length})</span></h3><div style="display:flex; gap:4px; flex-wrap:wrap;"><button class="modal-close" id="changeBgBtn" style="width:auto; padding:0 8px; font-size:0.75rem;">🎬</button><button class="modal-close" id="deleteBgBtn" style="width:auto; padding:0 8px; font-size:0.75rem;">🗑背景</button><button class="modal-close" id="openMusicManagerBtn" style="width:auto; padding:0 8px; font-size:0.75rem;">🎵</button><button class="modal-close" id="logoutAdmin" style="width:auto; padding:0 8px; font-size:0.75rem;">🚪退出</button><button class="modal-close" id="closeAdminPanel">✕</button></div></div><div class="modal-body" id="adminMessageList">${renderAdminMsgList(sorted, bl)}</div></div>`;
+                modalContainer.appendChild(overlay);
+                overlay.querySelector('#closeAdminPanel').addEventListener('click', () => closeModal(overlay));
+                overlay.querySelector('#logoutAdmin').addEventListener('click', () => { isAdminAuthenticated = false; sessionStorage.removeItem(ADMIN_SESSION_KEY); closeModal(overlay); });
+                overlay.querySelector('#showBlacklistBtn').addEventListener('click', openBlacklistManager);
+                overlay.querySelector('#openMusicManagerBtn').addEventListener('click', openMusicManager);
+                overlay.querySelector('#changeBgBtn').addEventListener('click', changeBackgroundVideo);
+                overlay.querySelector('#deleteBgBtn').addEventListener('click', deleteLocalBackground);
+                overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(overlay); });
+                bindAdminButtons(overlay);
+            }
+            function renderAdminMsgList(messages, blacklist) {
+                if (!messages.length) return '<div style="text-align:center; color:#999; padding:20px;">暂无留言</div>';
+                return messages.map(m => {
+                    const blocked = blacklist.includes(m.ip);
+                    return `<div class="message-list-item" style="${blocked ? 'opacity:0.6; background:#fcf8f8;' : ''}"><div class="msg-content"><div class="msg-text">${escapeHtml(m.text)}</div><div class="msg-meta"><span>🕒 ${formatTime(m.timestamp)}</span><span class="msg-ip">🌐 ${m.ip==='0.0.0.0'?'未知':m.ip}</span>${blocked?'<span style="color:#c97a7a;">🚫已拉黑</span>':''}</div></div><button class="delete-msg-btn" data-del="${m.id}">🗑</button>${!blocked ? `<button class="block-ip-btn" data-block="${m.ip}">🚫</button>` : ''}</div>`;
+                }).join('');
+            }
+            function bindAdminButtons(overlay) {
+                overlay.querySelectorAll('.delete-msg-btn').forEach(b => b.addEventListener('click', function() { if (confirm('删除？')) { deleteMessageById(this.dataset.del); refreshAdminPanel(); } }));
+                overlay.querySelectorAll('.block-ip-btn').forEach(b => b.addEventListener('click', function() { const ip = this.dataset.block; if (ip === '0.0.0.0') { alert('未知IP'); return; } if (confirm(`拉黑 ${ip}？`)) { addToBlacklist(ip); refreshAdminPanel(); refreshDisplayQueue(); } }));
+            }
+            function refreshAdminPanel() {
+                const overlay = document.getElementById('adminPanel'); if (!overlay) return;
+                const msgs = loadMessagesRaw(), bl = loadBlacklist();
+                const sorted = [...msgs].sort((a,b) => b.timestamp - a.timestamp);
+                overlay.querySelector('#adminMessageList').innerHTML = renderAdminMsgList(sorted, bl);
+                overlay.querySelector('.badge-count').textContent = msgs.length;
+                overlay.querySelector('.blacklist-badge').textContent = `🚫 黑名单(${bl.length})`;
+                bindAdminButtons(overlay);
+            }
+            function openBlacklistManager() {
+                const bl = loadBlacklist();
+                const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+                overlay.innerHTML = `<div class="modal" style="max-width:400px"><div class="modal-header"><h3>🚫 黑名单</h3><button class="modal-close close-bl">✕</button></div><div class="modal-body">${bl.length === 0 ? '<p style="color:#999;">黑名单为空</p>' : bl.map(ip => `<div style="display:flex; justify-content:space-between; padding:8px; background:#f9f6f6; border-radius:8px; margin-bottom:6px;"><span>🌐 ${ip}</span><button class="modal-close unblock-btn" data-ip="${ip}" style="width:auto; padding:4px 12px; font-size:0.8rem; background:#ffe6e6;">解除</button></div>`).join('')}</div></div>`;
+                modalContainer.appendChild(overlay);
+                overlay.querySelector('.close-bl').addEventListener('click', () => closeModal(overlay));
+                overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(overlay); });
+                overlay.querySelectorAll('.unblock-btn').forEach(b => b.addEventListener('click', function() { if (confirm('解除 '+this.dataset.ip+' ？')) { removeFromBlacklist(this.dataset.ip); closeModal(overlay); refreshAdminPanel(); refreshDisplayQueue(); } }));
+            }
+            function openMusicManager() {
+                const overlay = document.createElement('div'); overlay.className = 'modal-overlay';
+                overlay.innerHTML = `<div class="modal" style="max-width:450px"><div class="modal-header"><h3>🎵 音乐管理</h3><button class="modal-close close-music">✕</button></div><div class="modal-body"><div style="display:flex; gap:8px; margin-bottom:12px;"><input type="text" id="newSongName" placeholder="歌名" style="flex:1; padding:8px; border-radius:8px; border:1px solid #ccc;"><input type="text" id="newSongUrl" placeholder="MP3链接" style="flex:2; padding:8px; border-radius:8px; border:1px solid #ccc;"><button id="addSongBtn" style="padding:8px 12px; background:#5b7b94; color:#fff; border:none; border-radius:8px;">添加</button></div><div id="songListContainer" style="max-height:250px; overflow-y:auto;"></div></div></div>`;
+                modalContainer.appendChild(overlay);
+                overlay.querySelector('.close-music').addEventListener('click', () => closeModal(overlay));
+                overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(overlay); });
+                renderSongManagerList(overlay);
+                overlay.querySelector('#addSongBtn').addEventListener('click', () => {
+                    const name = overlay.querySelector('#newSongName').value.trim();
+                    const url = overlay.querySelector('#newSongUrl').value.trim();
+                    if (!name || !url) return alert('请填写完整');
+                    currentPlaylist.push({ name, url }); savePlaylist(currentPlaylist);
+                    renderSongManagerList(overlay);
+                    overlay.querySelector('#newSongName').value = ''; overlay.querySelector('#newSongUrl').value = '';
+                    if (currentPlaylist.length === 1) { currentSongIndex = 0; loadSong(0); }
+                });
+            }
+            function renderSongManagerList(overlay) {
+                const container = overlay.querySelector('#songListContainer');
+                container.innerHTML = currentPlaylist.map((s,i) => `<div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #eee;"><span>${i+1}. ${s.name}</span><button class="modal-close del-song" data-index="${i}" style="width:auto; padding:4px 8px; font-size:0.8rem;">🗑</button></div>`).join('');
+                container.querySelectorAll('.del-song').forEach(b => b.addEventListener('click', function() {
+                    const idx = parseInt(this.dataset.index);
+                    if (confirm('删除《'+currentPlaylist[idx].name+'》？')) {
+                        currentPlaylist.splice(idx,1); savePlaylist(currentPlaylist);
+                        if (currentSongIndex >= currentPlaylist.length) currentSongIndex = currentPlaylist.length-1;
+                        if (currentSongIndex >= 0) loadSong(currentSongIndex); else { audioPlayer.src=''; currentSongName.textContent='无歌曲'; }
+                        renderSongManagerList(overlay);
+                    }
+                }));
+            }
+
+            function closeModal(overlay) { if (overlay) { overlay.style.animation = 'fadeIn 0.2s reverse'; setTimeout(() => overlay.remove(), 250); } }
+            function formatTime(ts) { const d = new Date(ts); const now = new Date(); const diff = Math.floor((now-d)/60000); if (diff<1) return '刚刚'; if (diff<60) return diff+'分钟前'; if (diff<1440) return Math.floor(diff/60)+'小时前'; return d.toLocaleDateString(); }
+            function escapeHtml(s) { const div = document.createElement('div'); div.textContent = s; return div.innerHTML; }
+
+            // ==================== 事件绑定 ====================
+            adminEntry.addEventListener('click', () => {
+                if (isAdminAuthenticated) openAdminPanel(); else openPasswordModal();
+            });
+            document.addEventListener('keydown', e => { if (e.key === 'Escape') { const modals = modalContainer.querySelectorAll('.modal-overlay'); if (modals.length) closeModal(modals[modals.length-1]); } });
+
+            // ==================== 初始化 ====================
+            async function init() {
+                await initBackgroundVideo();
+                initPlaylist();
+                attemptAutoPlay();
+                loadMessagesRawCurrent = JSON.stringify(loadMessagesRaw());
+                refreshDisplayQueue();
+                updateCharCount();
+                messageInput.focus();
+            }
+            init();
+        })();
+    </script>
+</body>
+</html>
